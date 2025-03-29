@@ -26,19 +26,15 @@ internal class PixelsNormalizerService : IPixelsNormalizerService
         var strideG = tensor.Strides[1] * 1;
         var strideB = tensor.Strides[1] * 2;
 
-        // Get a span of the whole tensor for fast access
-        var tensorSpan = tensor.Span;
-
-        // Try get continuous memory block of the entire image data
-        if (image.DangerousTryGetSinglePixelMemory(out var memory))
+        Parallel.For(0, image.Height, y =>
         {
+            var memory = image.DangerousGetPixelRowMemory(y);
             var pixels = memory.Span;
-            var length = height * width;
-
-            for (var index = 0; index < length; index++)
+            var tensorSpan = tensor.Buffer.Span;
+            
+            for (var index = 0; index < width; ++index)
             {
                 var x = index % width;
-                var y = index / width;
 
                 var tensorIndex = strideR + strideY * (y + padding.Y) + strideX * (x + padding.X);
 
@@ -46,23 +42,7 @@ internal class PixelsNormalizerService : IPixelsNormalizerService
 
                 WritePixel(tensorSpan, tensorIndex, pixel, strideR, strideG, strideB);
             }
-        }
-        else
-        {
-            for (var y = 0; y < height; y++)
-            {
-                var rowSpan = image.DangerousGetPixelRowMemory(y).Span;
-                var tensorYIndex = strideR + strideY * (y + padding.Y);
-
-                for (var x = 0; x < width; x++)
-                {
-                    var tensorIndex = tensorYIndex + strideX * (x + padding.X);
-                    var pixel = rowSpan[x];
-
-                    WritePixel(tensorSpan, tensorIndex, pixel, strideR, strideG, strideB);
-                }
-            }
-        }
+        });
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
